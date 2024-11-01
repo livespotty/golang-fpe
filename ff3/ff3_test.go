@@ -109,7 +109,7 @@ func Test_Decrypt_InvalidRadix(t *testing.T) {
 }
 
 func Test_Encrypt_Int(t *testing.T) {
-	ff3, err := GetFF3Cipher()
+	ff3, err := GetFF3Cipher(62)
 	assert.NoError(t, err)
 
 	result, err := FF3EncryptInt(ff3, 123456, 6)

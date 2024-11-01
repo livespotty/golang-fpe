@@ -1,4 +1,4 @@
-module github.com/dusty-cjh/golang-ff3
+module github.com/dusty-cjh/golang-fpe
 
 go 1.22.3
 

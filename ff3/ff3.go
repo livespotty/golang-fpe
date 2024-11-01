@@ -19,8 +19,6 @@ const (
 	TWEAK_LEN_NEW  = 7
 	HALF_TWEAK_LEN = TWEAK_LEN / 2
 	DOMAIN_MIN     = 1000000
-	BASE62         = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	BASE62_LEN     = len(BASE62)
 	RADIX_MAX      = 256
 )
 
@@ -60,8 +58,8 @@ func NewFF3Cipher(key, tweak string, radix int) (*FF3Cipher, error) {
 		return nil, err
 	}
 
-	alphabet := BASE62[:radix]
-	if radix > BASE62_LEN {
+	alphabet := ff3Alphabet[:radix]
+	if radix > ff3AlphabetLen {
 		alphabet = ""
 	}
 
