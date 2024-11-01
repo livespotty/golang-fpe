@@ -99,6 +99,11 @@ Use these environment variables:
 
 This project was built and tested with Golang1.22.3 and later versions.
 
+## The FF3 Algorithm
+
+* [保形加密 - 中文解释](https://knowuv.com/en/blog/math/fpe_encryption)
+* [Galois Field - basis of FPE](https://knowuv.com/en/blog/math/galois_field)
+
 ## License
 
 This project is licensed under the terms of the [Apache 2.0 license](https://www.apache.org/licenses/LICENSE-2.0).
