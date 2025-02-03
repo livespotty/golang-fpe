@@ -1,4 +1,4 @@
-module github.com/dusty-cjh/golang-fpe
+module github.com/livespotty/golang-fpe
 
 go 1.22.3
 
