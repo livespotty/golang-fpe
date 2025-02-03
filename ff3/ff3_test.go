@@ -2,9 +2,9 @@ package ff3
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFF3Cipher_Encrypt_Decrypt(t *testing.T) {
@@ -120,4 +120,16 @@ func Test_Encrypt_Int(t *testing.T) {
 	val, err := FF3DecryptInt(ff3, result)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(123456), val)
+}
+
+func Test_Encrypt_ValidInput2(t *testing.T) {
+	cipher, err := NewFF3CipherCustomAlphabet("2b7e151628aed2a6abf7158809cf4f3c", "abcdef1234567890",":. /1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+	assert.NoError(t, err)
+
+	plaintext := "523457ABC"
+	result, err := cipher.Encrypt(plaintext)
+	print(result)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, result)
+	t.Logf("got encrypted data: %v -> %v", plaintext, result)
 }

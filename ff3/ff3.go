@@ -74,6 +74,45 @@ func NewFF3Cipher(key, tweak string, radix int) (*FF3Cipher, error) {
 	}, nil
 }
 
+func NewFF3CipherCustomAlphabet(key, tweak string, customalpha string) (*FF3Cipher, error) {
+	keyBytes, err := hex.DecodeString(key)
+	if err != nil {
+		return nil, err
+	}
+	var radix = len(customalpha)
+	if radix < 2 || radix > RADIX_MAX {
+		return nil, errors.New("radix must be between 2 and 256, inclusive")
+	}
+
+	minLen := int(math.Ceil(math.Log(DOMAIN_MIN) / math.Log(float64(radix))))
+	maxLen := 2 * int(math.Floor(96/math.Log2(float64(radix))))
+
+	if len(keyBytes) != 16 && len(keyBytes) != 24 && len(keyBytes) != 32 {
+		return nil, errors.New("key length must be 128, 192, or 256 bits")
+	}
+
+	aesCipher, err := aes.NewCipher(reverseBytes(keyBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	alphabet := customalpha[:radix]
+	ff3AlphabetLen = len(alphabet)
+	if radix > ff3AlphabetLen {
+		alphabet = ""
+	}
+
+	return &FF3Cipher{
+		key:       keyBytes,
+		tweak:     tweak,
+		radix:     radix,
+		alphabet:  alphabet,
+		minLen:    minLen,
+		maxLen:    maxLen,
+		aesCipher: aesCipher,
+	}, nil
+}
+
 func (c *FF3Cipher) Encrypt(plaintext string) (string, error) {
 	return c.encryptWithTweak(plaintext, c.tweak)
 }
