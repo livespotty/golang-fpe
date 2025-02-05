@@ -123,13 +123,23 @@ func Test_Encrypt_Int(t *testing.T) {
 }
 
 func Test_Encrypt_ValidInput2(t *testing.T) {
-	cipher, err := NewFF3CipherCustomAlphabet("2b7e151628aed2a6abf7158809cf4f3c", "abcdef1234567890",":. /1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+	cipher, err := NewFF3CipherCustomAlphabet("2b7e151628aed2a6abf7158809cf4f3c", "abcdef1234567890","ôàù?1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
 	assert.NoError(t, err)
-
-	plaintext := "523457ABC"
+	plaintext := "123A9B4?àôù"
 	result, err := cipher.Encrypt(plaintext)
-	print(result)
+	print(result,"\n")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, result)
 	t.Logf("got encrypted data: %v -> %v", plaintext, result)
+}
+
+func Test_Decrypt_ValidInput2(t *testing.T) {
+	cipher, err := NewFF3CipherCustomAlphabet("2b7e151628aed2a6abf7158809cf4f3c", "abcdef1234567890","ôàù?1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+	assert.NoError(t, err)
+	plaintext := "QùiUh7UFQuz"
+	result2, err := cipher.Decrypt(plaintext)
+	print(result2)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, result2)
+	t.Logf("got encrypted data: %v -> %v", plaintext,result2)
 }
