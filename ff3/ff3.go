@@ -79,29 +79,40 @@ func NewFF3CipherCustomAlphabet(key, tweak string, customalpha string) (*FF3Ciph
 	if err != nil {
 		return nil, err
 	}
-	var radix = len(customalpha)
+
+	// Handle customalpha as a UTF-8-safe string (rune slice)
+	runesAlpha := []rune(customalpha)
+	radix := len(runesAlpha)
+
 	if radix < 2 || radix > RADIX_MAX {
 		return nil, errors.New("radix must be between 2 and 256, inclusive")
 	}
 
+	// Calculate the min and max length based on the radix
 	minLen := int(math.Ceil(math.Log(DOMAIN_MIN) / math.Log(float64(radix))))
-	maxLen := 2 * int(math.Floor(96/math.Log2(float64(radix))))
+	maxLen := 2 * int(math.Floor(96 / math.Log2(float64(radix))))
 
+	// Ensure the key length is valid (128, 192, or 256 bits)
 	if len(keyBytes) != 16 && len(keyBytes) != 24 && len(keyBytes) != 32 {
 		return nil, errors.New("key length must be 128, 192, or 256 bits")
 	}
 
+	// Reverse the key bytes for AES cipher (UTF-8 safe)
 	aesCipher, err := aes.NewCipher(reverseBytes(keyBytes))
 	if err != nil {
 		return nil, err
 	}
 
-	alphabet := customalpha[:radix]
-	ff3AlphabetLen = len(alphabet)
+	// Use only the first 'radix' runes of the custom alphabet
+	alphabet := string(runesAlpha[:radix])
+
+	// Set the alphabet length
+	ff3AlphabetLen := len(alphabet)
 	if radix > ff3AlphabetLen {
 		alphabet = ""
 	}
 
+	// Return a new FF3Cipher with the given parameters
 	return &FF3Cipher{
 		key:       keyBytes,
 		tweak:     tweak,
@@ -113,6 +124,7 @@ func NewFF3CipherCustomAlphabet(key, tweak string, customalpha string) (*FF3Ciph
 	}, nil
 }
 
+
 func (c *FF3Cipher) Encrypt(plaintext string) (string, error) {
 	return c.encryptWithTweak(plaintext, c.tweak)
 }
@@ -123,7 +135,9 @@ func (c *FF3Cipher) encryptWithTweak(plaintext, tweak string) (string, error) {
 		return "", err
 	}
 
-	n := len(plaintext)
+	runes := []rune(plaintext) // Convert to runes for UTF-8 safety
+	n := len(runes)            // Count runes instead of bytes
+
 	if n < c.minLen || n > c.maxLen {
 		return "", errors.New("message length is not within min and max bounds")
 	}
@@ -134,8 +148,8 @@ func (c *FF3Cipher) encryptWithTweak(plaintext, tweak string) (string, error) {
 
 	u := (n + 1) / 2
 	v := n - u
-	A := plaintext[:u]
-	B := plaintext[u:]
+	A := runes[:u] // Slice runes instead of bytes
+	B := runes[u:]
 
 	if len(tweakBytes) == TWEAK_LEN_NEW {
 		tweakBytes = calculateTweak64FF31(tweakBytes)
@@ -158,7 +172,7 @@ func (c *FF3Cipher) encryptWithTweak(plaintext, tweak string) (string, error) {
 			W = Tl
 		}
 
-		P := calculateP(i, c.alphabet, W, B)
+		P := calculateP(i, c.alphabet, W, string(B)) // Convert runes to string
 		revP := reverseBytes([]byte(P))
 
 		S := make([]byte, BLOCK_SIZE)
@@ -166,7 +180,7 @@ func (c *FF3Cipher) encryptWithTweak(plaintext, tweak string) (string, error) {
 
 		y := new(big.Int).SetBytes(reverseBytes(S))
 
-		cInt := decodeBigInt(A, c.alphabet)
+		cInt := decodeBigInt(string(A), c.alphabet) // Convert runes to string
 		cInt.Add(cInt, y)
 		if i%2 == 0 {
 			cInt.Mod(cInt, modU)
@@ -176,18 +190,10 @@ func (c *FF3Cipher) encryptWithTweak(plaintext, tweak string) (string, error) {
 
 		C := encodeBigInt(cInt, c.alphabet, m)
 		A = B
-		B = C
+		B = []rune(C) // Convert string to runes for UTF-8 safety
 	}
 
-	return A + B, nil
-}
-
-func reverseString(s string) string {
-	runes := []rune(s)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-	return string(runes)
+	return string(A) + string(B), nil // Convert runes back to string
 }
 
 func reverseBytes(b []byte) []byte {
@@ -210,6 +216,7 @@ func calculateTweak64FF31(tweak56 []byte) []byte {
 	return tweak64
 }
 
+
 func calculateP(i int, alphabet string, W []byte, B string) string {
 	P := make([]byte, BLOCK_SIZE)
 	P[0] = W[0]
@@ -217,37 +224,51 @@ func calculateP(i int, alphabet string, W []byte, B string) string {
 	P[2] = W[2]
 	P[3] = W[3] ^ byte(i)
 
-	BBytes := decodeBigInt(B, alphabet).FillBytes(make([]byte, 12))
-	copy(P[BLOCK_SIZE-len(BBytes):], BBytes)
+	// Ensure B is handled as a UTF-8 safe rune-based string
+	BBytes := decodeBigInt(B, alphabet).FillBytes(make([]byte, BLOCK_SIZE-4)) // Adjust to fit remaining bytes
+	copy(P[len(P)-len(BBytes):], BBytes)
+
 	return string(P)
 }
 
 func encodeBigInt(n *big.Int, alphabet string, length int) string {
-	base := big.NewInt(int64(len(alphabet)))
-	x := ""
+	runes := []rune(alphabet) // Convert alphabet to runes for UTF-8 safety
+	base := big.NewInt(int64(len(runes)))
+	var builder strings.Builder
+
 	for n.Cmp(base) >= 0 {
 		mod := new(big.Int)
 		n.DivMod(n, base, mod)
-		x += string(alphabet[mod.Int64()])
+		builder.WriteRune(runes[mod.Int64()])
 	}
-	x += string(alphabet[n.Int64()])
-	if len(x) < length {
-		x = x + strings.Repeat(string(alphabet[0]), length-len(x))
+	builder.WriteRune(runes[n.Int64()])
+
+	// Pad if necessary
+	for builder.Len() < length {
+		builder.WriteRune(runes[0])
 	}
-	return x
+
+	return builder.String()
 }
 
+// decodeBigInt converts a string to a big.Int using a custom alphabet (UTF-8 friendly)
 func decodeBigInt(s, alphabet string) *big.Int {
-	strlen := len(s)
-	base := len(alphabet)
+	runes := []rune(s)           // Convert input string to runes
+	runesAlpha := []rune(alphabet) // Convert alphabet to runes
+	base := len(runesAlpha)
 	num := new(big.Int)
 
-	for idx, char := range reverseString(s) {
+	// Reverse the runes to process from least to most significant
+	reversedRunes := reverseRunes(runes)
+	strlen := len(reversedRunes)
+
+	for idx, char := range reversedRunes {
 		power := strlen - (idx + 1)
-		// Find the index of the character in the alphabet
-		charIndex := strings.IndexRune(alphabet, char)
+
+		// Find the index of the character in the alphabet (UTF-8 safe)
+		charIndex := indexRune(runesAlpha, char)
 		if charIndex == -1 {
-			panic(errors.New(fmt.Sprintf("char %c not found in alphabet %s", char, alphabet)))
+			panic(fmt.Errorf("char '%c' not found in alphabet", char))
 		}
 
 		// Calculate the value and add it to num
@@ -259,6 +280,25 @@ func decodeBigInt(s, alphabet string) *big.Int {
 	return num
 }
 
+// reverseRunes reverses a slice of runes (UTF-8 safe)
+func reverseRunes(runes []rune) []rune {
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+	return runes
+}
+
+// indexRune finds the index of a rune in a slice of runes (UTF-8 safe)
+func indexRune(alphabet []rune, char rune) int {
+	for i, a := range alphabet {
+		if a == char {
+			return i
+		}
+	}
+	return -1
+}
+
+
 func (c *FF3Cipher) Decrypt(ciphertext string) (string, error) {
 	return c.decryptWithTweak(ciphertext, c.tweak)
 }
@@ -269,7 +309,9 @@ func (c *FF3Cipher) decryptWithTweak(ciphertext, tweak string) (string, error) {
 		return "", err
 	}
 
-	n := len(ciphertext)
+	runes := []rune(ciphertext) // Convert to runes for UTF-8 safety
+	n := len(runes) // Use length of runes instead of bytes
+
 	if n < c.minLen || n > c.maxLen {
 		return "", fmt.Errorf("message length %d is not within min %d and max %d bounds", n, c.minLen, c.maxLen)
 	}
@@ -280,8 +322,8 @@ func (c *FF3Cipher) decryptWithTweak(ciphertext, tweak string) (string, error) {
 
 	u := (n + 1) / 2
 	v := n - u
-	A := ciphertext[:u]
-	B := ciphertext[u:]
+	A := runes[:u] // Slice using runes to preserve multibyte characters
+	B := runes[u:]
 
 	if len(tweakBytes) == TWEAK_LEN_NEW {
 		tweakBytes = calculateTweak64FF31(tweakBytes)
@@ -304,7 +346,7 @@ func (c *FF3Cipher) decryptWithTweak(ciphertext, tweak string) (string, error) {
 			W = Tl
 		}
 
-		P := calculateP(i, c.alphabet, W, A)
+		P := calculateP(i, c.alphabet, W, string(A)) // Convert runes to string
 		revP := reverseBytes([]byte(P))
 
 		S := make([]byte, BLOCK_SIZE)
@@ -313,7 +355,7 @@ func (c *FF3Cipher) decryptWithTweak(ciphertext, tweak string) (string, error) {
 
 		y := new(big.Int).SetBytes(S)
 
-		cInt := decodeBigInt(B, c.alphabet)
+		cInt := decodeBigInt(string(B), c.alphabet) // Convert runes to string
 		cInt.Sub(cInt, y)
 		if i%2 == 0 {
 			cInt.Mod(cInt, modU)
@@ -323,15 +365,14 @@ func (c *FF3Cipher) decryptWithTweak(ciphertext, tweak string) (string, error) {
 
 		C := encodeBigInt(cInt, c.alphabet, m)
 		B = A
-		A = C
+		A = []rune(C) // Convert string to runes for safe indexing
 	}
 
-	return A + B, nil
+	return string(A) + string(B), nil // Convert runes back to string
 }
 
 func FF3EncryptInt(c *FF3Cipher, val int64, length int) (string, error) {
 	plaintext := encodeBigInt(big.NewInt(val), c.alphabet, length)
-	fmt.Println("94035rgtjyuh", plaintext)
 	return c.Encrypt(plaintext)
 }
 
